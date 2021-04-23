@@ -1,0 +1,25 @@
+---
+title: "Exploration"
+author: "Carmen Galaz-García"
+date: "4/15/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(here)
+library(janitor)
+```
+
+
+
+```{r}
+data <- read.csv(here('data','COPR_NCOS_Bird_Survey_Data_Aug2017_Aug2019.csv')) %>% 
+  clean_names()
+
+unique(data$survey_year)
+unique(data$location)
+unique(data$duration)
+```
+
