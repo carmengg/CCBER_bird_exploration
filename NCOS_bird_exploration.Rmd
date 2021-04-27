@@ -1,8 +1,14 @@
 ---
-title: "Exploration"
+title: "NCOS/Devereoux Slough 2017-2019 bird survey exploration"
 author: "Carmen Galaz-García"
 date: "4/15/2021"
-output: html_document
+output: 
+  html_document:
+    #toc: true  # make a table of contents
+    #toc_float: true  # table of contents as sidebar
+    #number_sections: true  
+    code_folding: hide  # makes hide/show for code---
+
 ---
 
 ```{r setup, include=FALSE}
@@ -10,16 +16,112 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(here)
 library(janitor)
+library(lubridate)
+library(tsibble)
+
 ```
 
 
 
-```{r}
-data <- read.csv(here('data','COPR_NCOS_Bird_Survey_Data_Aug2017_Aug2019.csv')) %>% 
+```{r, include=FALSE}
+pre_survey_data <- read.csv(here('CCBER_data_and_script_files','survey_data.csv')) %>%
   clean_names()
 
-unique(data$survey_year)
-unique(data$location)
-unique(data$duration)
+post_survey_data <- read.csv(here('data','COPR_NCOS_Bird_Survey_Data_Aug2017_Aug2019.csv')) %>% 
+  clean_names()
+
+```
+
+```{r, include = FALSE}
+pre_restoration <- pre_survey_data %>% 
+  filter(2011<= year )
+
+unique(pre_restoration$year)
+```
+
+## Data selection
+```{r}
+post_restoration <- post_survey_data %>% 
+  mutate(observation_date = lubridate::mdy(observation_date)) %>% # convert to date format
+  mutate(location = replace(location, location=="Devereux Slough", "DEVEREUX SLOUGH")) %>% 
+  filter( 2016 <= year(observation_date),
+          location %in% c("DEVEREUX SLOUGH", "NCOS")) %>%                     
+  select(observation_date, 
+         location, 
+         general_type,
+         count) %>% # select general_type/ebird_type
+  count(observation_date,location,general_type, 
+        wt=count) # count by date and general_type
+
+#unique(year(post_restoration$observation_date))
+#unique(post_restoration$location)
+```
+
+
+```{r, include = FALSE}
+NCOS_post_restoration <- post_restoration %>% 
+  filter(location == "NCOS") %>% 
+  as_tsibble(key = general_type ,index = observation_date)
+
+DEV_post_restoration <- post_restoration %>% 
+  filter(location %in% c("Devereux Slough","DEVEREUX SLOUGH")) %>% 
+  as_tsibble(key=general_type ,index=observation_date)
+```
+
+
+## Exploratory graph 1
+```{r}
+ggplot(data= post_restoration, aes(x=observation_date, y=n)) +
+  #geom_line(aes(col=general_type)) 
+  geom_line(aes(col=location))+
+  facet_wrap(~general_type) +
+  theme_light()+
+  theme(axis.text.x = element_text(angle = 60, hjust = 1)) +
+  labs(title="Comparison of monthly bird counts at Deveroux Slough and NCOS \ngrouping by general type",
+       x="observation date",
+       y= "count")
+
+```
+
+## Exploratory graph 2
+
+Visualizing bird groups with high counts separately. 
+
+```{r}
+high_counts <- post_restoration %>% 
+  filter(general_type %in% c("Insectivores",
+                             "Waterfowl & Friends",
+                             "Shorebirds"))
+
+
+ggplot(data= high_counts, aes(x=observation_date, y=n)) +
+  #geom_line(aes(col=general_type)) 
+  geom_line(aes(col=location))+
+  facet_wrap(~general_type) +
+  theme_light()+
+  theme(axis.text.x = element_text(angle = 60, hjust = 1)) 
+
+```
+
+
+## Exploratory graph 3
+
+ Visualizing rest of bird groups.
+
+```{r}
+
+other_counts <- post_restoration %>% 
+  filter(!(general_type %in% c("Insectivores",
+                             "Waterfowl & Friends",
+                             "Shorebirds")))
+ggplot(data= other_counts, aes(x=observation_date, y=n)) +
+  #geom_line(aes(col=general_type)) 
+  geom_line(aes(col=location))+
+  facet_wrap(~general_type) +
+  theme_light()+
+  theme(axis.text.x = element_text(angle = 60, hjust = 1)) 
+
+
+
 ```
 
