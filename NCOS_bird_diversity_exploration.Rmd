@@ -6,7 +6,7 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = FALSE)
 library(tidyverse)
 library(here)
 library(janitor)
@@ -22,6 +22,7 @@ post_survey_data <- read.csv(here('data','COPR_NCOS_Bird_Survey_Data_Aug2017_Aug
 
 ## Data selection
 ```{r}
+# Select post-restoration data with desired variables
 post_restoration <- post_survey_data %>% 
   mutate(observation_date = lubridate::mdy(observation_date)) %>% # convert to date format
   mutate(location = replace(location, location=="Devereux Slough", "DEVEREUX SLOUGH")) %>% 
@@ -31,28 +32,34 @@ post_restoration <- post_survey_data %>%
          location,
          species,
          general_type,
-         count) %>% 
-  unite("species_and_type", species, general_type, sep="*")
+         count) 
 
-
-
-count_post_restoration <- post_restoration %>% 
+# -------------------------------------------------------------------------------
+# Count number of individuals per species, observation date and location
+# Keep associated general type
+species_count <- post_restoration %>% 
+  unite("species_and_type", species, general_type, sep="*") %>% 
   count(observation_date,location, species_and_type,
         wt=count) %>% 
   separate(species_and_type, c("species","general_type"), sep="([*])") 
 
-#unique(year(post_restoration$observation_date))
-#unique(post_restoration$location)
+# -------------------------------------------------------------------------------
+# Count number of individuals per type, observation date and location
+type_count <- post_restoration %>% 
+  select(!species) %>% 
+  count(observation_date,location,general_type, 
+        wt=count)
+
 ```
 
 
 ```{r, include = FALSE}
 
-NCOS_post_restoration <- count_post_restoration %>% 
+NCOS_post_restoration <- species_count %>% 
   filter(location == "NCOS") %>% 
   as_tsibble(key = species ,index = observation_date)
 
-DEV_post_restoration <- count_post_restoration %>% 
+DEV_post_restoration <- species_count %>% 
   filter(location %in% c("Devereux Slough","DEVEREUX SLOUGH")) %>% 
   as_tsibble(key = species ,index = observation_date)
 ```
@@ -61,36 +68,38 @@ DEV_post_restoration <- count_post_restoration %>%
 
 
 ```{r}
-insectivores <- count_post_restoration %>% 
+insectivores <- species_count %>% 
     filter(location == "NCOS") %>% 
   filter(general_type == "Insectivores") %>% 
-  mutate(species = case_when( n < 40 ~ "other",
-                              n >= 40 ~ species)) 
+  mutate(species = case_when( n < 25 ~ "other",
+                              n >= 25 ~ species)) 
 
 ggplot(insectivores, aes(fill=species, y=n, x=observation_date)) + 
     geom_bar(position="stack", stat="identity")+
-  labs(title="Insectivores at NCOS")+
+  labs(title="Insectivores at NCOS (09/2017-08/2019)",
+       y = "number of individuals registered (n)")+
   theme_light()
 
 ```
 
 ```{r}
-seed_fruit <- count_post_restoration %>% 
+seed_fruit <- species_count %>% 
     filter(location == "NCOS") %>% 
   filter(general_type == "Seed & Fruit Eaters") %>% 
-  mutate(species = case_when( n < 40 ~ "other",
-                              n >= 40 ~ species)) 
+  mutate(species = case_when( n < 20 ~ "other",
+                              n >= 20 ~ species)) 
 
 ggplot(seed_fruit, aes(fill=species, y=n, x=observation_date)) + 
     geom_bar(position="stack", stat="identity")+
-  labs(title="Seed and Fruit Eaters at NCOS")+
+  labs(title="Seed and Fruit Eaters at NCOS (09/2017-08/2019)",
+       y = "number of individuals registered (n)")+
   theme_light()
 
 ```
 
 ```{r}
 
-omnivores <- count_post_restoration %>% 
+omnivores <- species_count %>% 
     filter(location == "NCOS") %>% 
   filter(general_type == "Omnivores") %>% 
   mutate(species = case_when( n < 10 ~ "other",
@@ -99,20 +108,22 @@ omnivores <- count_post_restoration %>%
 
 ggplot(omnivores, aes(fill=species, y=n, x=observation_date)) + 
     geom_bar(position="stack", stat="identity")+
-  labs(title="Omnivores at NCOS")+
+  labs(title="Omnivores at NCOS (09/2017-08/2019)",
+       y = "number of individuals registered (n)")+
   theme_light()
 ```
 
 ```{r, include=FALSE}
 
 #Checking crow counts in "8/22/2018"
+
 crows_0718 <- post_survey_data %>% 
   filter(location == "NCOS", 
          species == "American Crow",
          observation_date == "8/22/2018")
 
 
-crows_0718_count <- post_restoration %>% 
+crows_0718_count <- species_count %>% 
   filter(location == "NCOS", 
          species_and_type == "American Crow*Omnivores",
          year(observation_date) == 2018,
