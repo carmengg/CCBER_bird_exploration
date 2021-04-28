@@ -20,8 +20,8 @@ post_survey_data <- read.csv(here('data','COPR_NCOS_Bird_Survey_Data_Aug2017_Aug
 ```
 
 
-## Data selection
 ```{r}
+# DATA SELECTION
 # Select post-restoration data with desired variables
 post_restoration <- post_survey_data %>% 
   mutate(observation_date = lubridate::mdy(observation_date)) %>% # convert to date format
@@ -53,6 +53,24 @@ type_count <- post_restoration %>%
 ```
 
 
+### Counts of individuals per type in NCOS and Deveroux
+
+<br>
+<br>
+
+```{r}
+ggplot(data= type_count, aes(x=observation_date, y=n)) +
+  #geom_line(aes(col=general_type)) 
+  geom_line(aes(col=location))+
+  facet_wrap(~general_type) +
+  theme_light()+
+  theme(axis.text.x = element_text(angle = 60, hjust = 1)) +
+  labs(title="Comparison of monthly bird counts at Deveroux Slough and NCOS \ngrouping by general type",
+       x="observation date",
+       y= "number of individuals registered (n)")
+
+```
+
 ```{r, include = FALSE}
 
 NCOS_post_restoration <- species_count %>% 
@@ -65,35 +83,64 @@ DEV_post_restoration <- species_count %>%
 ```
 
 
-
+### Count by species in types with big count differences between NCOS and Deveroux
+<br>
+<br>
 
 ```{r}
-insectivores <- species_count %>% 
+insectivores_species <- species_count %>% 
     filter(location == "NCOS") %>% 
   filter(general_type == "Insectivores") %>% 
   mutate(species = case_when( n < 25 ~ "other",
                               n >= 25 ~ species)) 
 
-ggplot(insectivores, aes(fill=species, y=n, x=observation_date)) + 
-    geom_bar(position="stack", stat="identity")+
+insectivores_count <- type_count %>% 
+  filter(general_type == "Insectivores",
+         location %in% c("Devereux Slough","DEVEREUX SLOUGH")) %>% 
+  select(!general_type) 
+
+ggplot(insectivores_species) + 
+    geom_bar(position="stack", stat="identity", aes(fill=species, y=n, x=observation_date))+
+  scale_fill_manual(values = c("#FFDB6D", "#C4961A", "#D16103","azure3", 
+                "#C3D7A4", "#52854C", "#4E84C4", "darkorchid"))+
+    geom_line(data=insectivores_count, aes(x=observation_date, y=n, col=location))+
+    scale_colour_grey()+
   labs(title="Insectivores at NCOS (09/2017-08/2019)",
        y = "number of individuals registered (n)")+
-  theme_light()
+  theme_light()+
+  theme( # remove the vertical grid lines
+           panel.grid.major.x = element_blank() ,
+           panel.grid.minor.x = element_blank() ,
+    )
 
 ```
 
 ```{r}
-seed_fruit <- species_count %>% 
+seed_species <- species_count %>% 
     filter(location == "NCOS") %>% 
   filter(general_type == "Seed & Fruit Eaters") %>% 
   mutate(species = case_when( n < 20 ~ "other",
                               n >= 20 ~ species)) 
 
-ggplot(seed_fruit, aes(fill=species, y=n, x=observation_date)) + 
-    geom_bar(position="stack", stat="identity")+
+seed_count <- type_count %>% 
+  filter(general_type == "Seed & Fruit Eaters",
+         location %in% c("Devereux Slough","DEVEREUX SLOUGH")) %>% 
+  select(!general_type) 
+
+
+ggplot(seed_species) + 
+    geom_bar(position="stack", stat="identity", aes(fill=species, y=n, x=observation_date))+
+      scale_fill_manual(values = c("#4E84C4", "#C4961A", "azure3", "#D16103","#C3D7A4"))+
+    geom_line(data=seed_count, aes(x=observation_date, y=n, col=location))+
+      scale_colour_grey()+
   labs(title="Seed and Fruit Eaters at NCOS (09/2017-08/2019)",
        y = "number of individuals registered (n)")+
-  theme_light()
+  theme_light()+
+  theme( # remove the vertical grid lines
+           panel.grid.major.x = element_blank() ,
+           panel.grid.minor.x = element_blank() ,
+    )
+
 
 ```
 
@@ -123,10 +170,10 @@ crows_0718 <- post_survey_data %>%
          observation_date == "8/22/2018")
 
 
-crows_0718_count <- species_count %>% 
-  filter(location == "NCOS", 
-         species_and_type == "American Crow*Omnivores",
-         year(observation_date) == 2018,
-         month(observation_date) == 8)
+# crows_0718_count <- species_count %>% 
+#   filter(location == "NCOS", 
+#          species_and_type == "American Crow*Omnivores",
+#          year(observation_date) == 2018,
+#          month(observation_date) == 8)
 ```
 
