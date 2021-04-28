@@ -1,0 +1,140 @@
+---
+title: "NCOS_bird_diversity_exploration"
+author: "Carmen Galaz-García"
+date: "4/27/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(here)
+library(janitor)
+library(lubridate)
+library(tsibble)
+
+```
+
+
+
+```{r, include=FALSE}
+post_survey_data <- read.csv(here('data','COPR_NCOS_Bird_Survey_Data_Aug2017_Aug2019.csv')) %>% 
+  clean_names()
+
+```
+
+
+## Data selection
+```{r}
+post_restoration <- post_survey_data %>% 
+  mutate(observation_date = lubridate::mdy(observation_date)) %>% # convert to date format
+  mutate(location = replace(location, location=="Devereux Slough", "DEVEREUX SLOUGH")) %>% 
+  filter( 2016 <= year(observation_date),
+          location %in% c("DEVEREUX SLOUGH", "NCOS"))%>%                     
+  select(observation_date, 
+         location,
+         species,
+         general_type,
+         count) %>% 
+  unite("species_and_type", species, general_type, sep="*")
+
+count_post_restoration <- post_restoration %>% 
+  count(observation_date,location, species_and_type,
+        wt=count) %>% 
+  separate(species_and_type, c("species","general_type"), sep="([*])") 
+
+#unique(year(post_restoration$observation_date))
+#unique(post_restoration$location)
+```
+
+
+```{r, include = FALSE}
+
+
+NCOS_post_restoration <- count_post_restoration %>% 
+  filter(location == "NCOS") %>% 
+  as_tsibble(key = species ,index = observation_date)
+
+DEV_post_restoration <- count_post_restoration %>% 
+  filter(location %in% c("Devereux Slough","DEVEREUX SLOUGH")) %>% 
+  as_tsibble(key = species ,index = observation_date)
+```
+
+
+```{r}
+insectivores <- count_post_restoration %>% 
+    filter(location == "NCOS") %>% 
+  filter(general_type == "Insectivores") %>% 
+  mutate(species = case_when( n < 40 ~ "other",
+                              n >= 40 ~ species)) 
+
+seed_fruit <- count_post_restoration %>% 
+    filter(location == "NCOS") %>% 
+  filter(general_type == "Seed & Fruit Eaters") %>% 
+  mutate(species = case_when( n < 40 ~ "other",
+                              n >= 40 ~ species)) 
+
+omnivores <- count_post_restoration %>% 
+    filter(location == "NCOS") %>% 
+  filter(general_type == "Omnivores") %>% 
+  mutate(species = case_when( n < 40 ~ "other",
+                              n >= 40 ~ species)) 
+  #filter(general_type %in% c("Insectivores","Seed & Fruit Eaters", "Omnivores"))
+
+
+ggplot(insectivores, aes(fill=species, y=n, x=observation_date)) + 
+    geom_bar(position="stack", stat="identity")+
+  labs(title="Insectivores at NCOS")+
+  theme_light()
+  #facet_wrap(~general_type)
+
+ggplot(seed_fruit, aes(fill=species, y=n, x=observation_date)) + 
+    geom_bar(position="stack", stat="identity")+
+  labs(title="Seed and Fruit Eaters at NCOS")+
+  theme_light()
+
+ggplot(omnivores, aes(fill=species, y=n, x=observation_date)) + 
+    geom_bar(position="stack", stat="identity")+
+  labs(title="Omnivores at NCOS")+
+  theme_light()
+```
+
+
+
+```{r}
+insectivores <- count_post_restoration %>% 
+    filter(location == "NCOS") %>% 
+  filter(general_type == "Insectivores") %>% 
+  mutate(species = case_when( n < 40 ~ "other",
+                              n >= 40 ~ species)) 
+
+seed_fruit <- count_post_restoration %>% 
+    filter(location == "NCOS") %>% 
+  filter(general_type == "Seed & Fruit Eaters") %>% 
+  mutate(species = case_when( n < 40 ~ "other",
+                              n >= 40 ~ species)) 
+
+omnivores <- count_post_restoration %>% 
+    filter(location == "NCOS") %>% 
+  filter(general_type == "Omnivores") %>% 
+  mutate(species = case_when( n < 40 ~ "other",
+                              n >= 40 ~ species)) 
+  #filter(general_type %in% c("Insectivores","Seed & Fruit Eaters", "Omnivores"))
+
+
+ggplot(insectivores, aes(fill=species, y=n, x=observation_date)) + 
+    geom_bar(position="stack", stat="identity")+
+  labs(title="Insectivores at NCOS")+
+  theme_light()
+  #facet_wrap(~general_type)
+
+ggplot(seed_fruit, aes(fill=species, y=n, x=observation_date)) + 
+    geom_bar(position="stack", stat="identity")+
+  labs(title="Seed and Fruit Eaters at NCOS")+
+  theme_light()
+
+ggplot(omnivores, aes(fill=species, y=n, x=observation_date)) + 
+    geom_bar(position="stack", stat="identity")+
+  labs(title="Omnivores at NCOS")+
+  theme_light()
+```
