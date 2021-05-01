@@ -6,7 +6,7 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(echo = FALSE, include = FALSE)
 library(tidyverse)
 library(here)
 library(janitor)
@@ -33,7 +33,9 @@ post_restoration <- post_survey_data %>%
          species,
          general_type,
          count) 
+```
 
+```{r}
 # -------------------------------------------------------------------------------
 # Count number of individuals per species, observation date and location
 # Keep associated general type
@@ -69,17 +71,6 @@ ggplot(data= type_count, aes(x=observation_date, y=n)) +
        x="observation date",
        y= "number of individuals registered (n)")
 
-```
-
-```{r, include = FALSE}
-
-NCOS_post_restoration <- species_count %>% 
-  filter(location == "NCOS") %>% 
-  as_tsibble(key = species ,index = observation_date)
-
-DEV_post_restoration <- species_count %>% 
-  filter(location %in% c("Devereux Slough","DEVEREUX SLOUGH")) %>% 
-  as_tsibble(key = species ,index = observation_date)
 ```
 
 <br>
@@ -124,11 +115,6 @@ ggplot(insectivores_species) +
 
 
 ---
-
-```{r}
-#Insectivores registered at Deveroux Slough
-#species_count %>% filter(location == "DEVEREUX SLOUGH", general_type == "Insectivores") 
-```
 
 
 
@@ -229,4 +215,3 @@ species_count %>% filter(location == "DEVEREUX SLOUGH", general_type == "Omnivor
 #          year(observation_date) == 2018,
 #          month(observation_date) == 8)
 ```
-
