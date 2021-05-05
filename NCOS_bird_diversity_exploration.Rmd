@@ -12,8 +12,9 @@ library(here)
 library(janitor)
 library(lubridate)
 library(tsibble)
+library(stringr)
 
-
+# raw data
 post_survey_data <- read.csv(here('data','COPR_NCOS_Bird_Survey_Data_Aug2017_Aug2019.csv')) %>% 
   clean_names()
 
@@ -21,18 +22,31 @@ post_survey_data <- read.csv(here('data','COPR_NCOS_Bird_Survey_Data_Aug2017_Aug
 
 
 ```{r}
-# DATA SELECTION
-# Select post-restoration data with desired variables
+# ------------------- DATA SELECTION ------------------------
+
 post_restoration <- post_survey_data %>% 
-  mutate(observation_date = lubridate::mdy(observation_date)) %>% # convert to date format
-  mutate(location = replace(location, location=="Devereux Slough", "DEVEREUX SLOUGH")) %>% 
-  filter( 2016 <= year(observation_date),
-          location %in% c("DEVEREUX SLOUGH", "NCOS"))%>%                     
+  # --- date formatting and selection ---
+  mutate(observation_date = lubridate::mdy(observation_date)) %>%
+  filter( 2016 <= year(observation_date)) %>% 
+  # --- location formatting and selection ---
+  mutate(location = replace(location, location =="Devereux Slough", "DEVEREUX SLOUGH")) %>% 
+  filter(!(location %in% c("BEACH SOUTH", "BEACH NORTH", "OUT OF POLYGON"))) %>% 
+  mutate(region = case_when( location == "NCOS" ~ "NCOS",
+                              location != "NCOS" ~ "DEV" )) %>% 
+  # --- column simplification ---
   select(observation_date, 
          location,
          species,
          general_type,
-         count) 
+         count,
+         region) 
+```
+
+```{r}
+# OWLS
+owls <- post_survey_data %>% 
+  filter(str_detect(species, "great") )
+unique(owls$species)
 ```
 
 ```{r}
@@ -41,7 +55,7 @@ post_restoration <- post_survey_data %>%
 # Keep associated general type
 species_count <- post_restoration %>% 
   unite("species_and_type", species, general_type, sep="*") %>% 
-  count(observation_date,location, species_and_type,
+  count(observation_date, location, species_and_type,
         wt=count) %>% 
   separate(species_and_type, c("species","general_type"), sep="([*])") 
 
