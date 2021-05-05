@@ -1,12 +1,18 @@
 ---
-title: "NCOS_bird_diversity_exploration"
+title: "NCOS Bird Diversity Exploration"
 author: "Carmen Galaz-García"
-date: "4/27/2021"
-output: html_document
+date: "5/5/2021"
+output: 
+  html_document:
+    toc: true  # make a table of contents
+    toc_float: true  # table of contents as sidebar
+    #number_sections: true  
+    code_folding: hide  # makes hide/show for code---
+
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE, include = FALSE)
+knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(here)
 library(janitor)
@@ -35,49 +41,35 @@ post_restoration <- post_survey_data %>%
                               location != "NCOS" ~ "DEV" )) %>% 
   # --- column simplification ---
   select(observation_date, 
-         location,
          species,
          general_type,
          count,
          region) 
 ```
 
-```{r}
+```{r, include=FALSE}
 # OWLS
 owls <- post_survey_data %>% 
   filter(str_detect(species, "great") )
 unique(owls$species)
 ```
 
-```{r}
-# -------------------------------------------------------------------------------
-# Count number of individuals per species, observation date and location
-# Keep associated general type
-species_count <- post_restoration %>% 
-  unite("species_and_type", species, general_type, sep="*") %>% 
-  count(observation_date, location, species_and_type,
-        wt=count) %>% 
-  separate(species_and_type, c("species","general_type"), sep="([*])") 
+## Abundance per type
 
-# -------------------------------------------------------------------------------
+
+```{r}
+
+# -------- TYPE ABUNDANCE ----------------
 # Count number of individuals per type, observation date and location
 type_count <- post_restoration %>% 
   select(!species) %>% 
-  count(observation_date,location,general_type, 
+  count(observation_date, region, general_type, 
         wt=count)
 
-```
+# ------- GRAPH ------
 
-
-### Counts of individuals per type in NCOS and Deveroux
-
-<br>
-<br>
-
-```{r}
 ggplot(data= type_count, aes(x=observation_date, y=n)) +
-  #geom_line(aes(col=general_type)) 
-  geom_line(aes(col=location))+
+  geom_line(aes(col=region))+
   facet_wrap(~general_type) +
   theme_light()+
   theme(axis.text.x = element_text(angle = 60, hjust = 1)) +
@@ -92,32 +84,74 @@ ggplot(data= type_count, aes(x=observation_date, y=n)) +
 <br>
 <br>
 
-### Count by species in types with big count differences between NCOS and Deveroux
+## Species abundance
 <br>
 <br>
+
+
 
 ```{r}
-insectivores_species <- species_count %>% 
-    filter(location == "NCOS") %>% 
-  filter(general_type == "Insectivores") %>% 
-  mutate(species = case_when( n < 25 ~ "other",
-                              n >= 25 ~ species)) 
+# ------- SPECIES ABUNDANCE ----------
 
-insectivores_count <- type_count %>% 
-  filter(general_type == "Insectivores",
-         location %in% c("Devereux Slough","DEVEREUX SLOUGH")) %>% 
-  select(!general_type) 
+# Count number of individuals per species, observation date and region (Dev/NCOS)
+# Keeps associated general type and location
+species_count <- post_restoration %>% 
+  unite("species_and_type", species, general_type, sep="*") %>% 
+  count(observation_date, region, species_and_type,
+        wt=count) %>% 
+  separate(species_and_type, c("species","general_type"), sep="([*])") 
+```
 
-ggplot(insectivores_species) + 
-    geom_bar(position="stack", stat="identity", aes(fill=species, y=n, x=observation_date))+
-  scale_fill_manual(values = c("#FFDB6D", "#C4961A", "#D16103","azure3", 
+
+```{r}
+# ------ TYPE AND LOCATION SELECTION ----
+select_type_location <- function(data,type,region1){
+  subset <- data %>% 
+    filter(general_type == type,
+           region == region1)
+  return(subset)
+}
+
+# ----- HIGH COUNT THRESHHOLD -----
+count_thresh <- function(data,max){
+  new_data <- data %>% 
+    mutate(species = case_when( n < max ~ "other",
+                              n >= max ~ species)) 
+  return(new_data)
+}
+
+```
+
+
+### Insectivores
+
+```{r}
+
+insectivores_species_NCOS <- species_count %>% 
+  select_type_location(type="Insectivores", region1="NCOS") %>% 
+  count_thresh(max=25)
+
+insectivores_count_DEV <- type_count %>% 
+  select_type_location(type="Insectivores", region1="DEV") 
+
+# --------------------------------------------------------------------
+ggplot() + 
+  # --- NCOS count by species ---
+    geom_bar(data = insectivores_species_NCOS,
+             position="stack", 
+             stat="identity", 
+             aes(fill=species, y=n, x=observation_date))+
+    scale_fill_manual(values = c("#FFDB6D", "#C4961A", "#D16103","azure3", 
                 "#C3D7A4", "#52854C", "#4E84C4", "darkorchid"))+
-    geom_line(data=insectivores_count, aes(x=observation_date, y=n, col=location))+
+  # --- DEV total count ---
+    geom_line(data=insectivores_count_DEV, 
+              aes(x=observation_date, y=n, col=region))+
     scale_colour_grey()+
-  labs(title="Insectivores at NCOS (09/2017-08/2019)",
-       y = "number of individuals registered (n)")+
-  theme_light()+
-  theme( # remove the vertical grid lines
+  # --- themes ---
+    labs(title="Insectivores at NCOS (09/2017-08/2019)",
+         y = "number of individuals registered (n)") +
+    theme_light()+
+    theme( # remove the vertical grid lines
            panel.grid.major.x = element_blank() ,
            panel.grid.minor.x = element_blank() ,
     )
@@ -125,31 +159,30 @@ ggplot(insectivores_species) +
 ```
 
 
-**Graph 2.** Other species had a count of less than 25 on a given date.
+**Graph 2.** Other species had a count of less than 25 individuals on a given date.
 
-
----
-
-
+### Seed & Fruit Eaters
 
 ```{r}
-seed_species <- species_count %>% 
-    filter(location == "NCOS") %>% 
-  filter(general_type == "Seed & Fruit Eaters") %>% 
-  mutate(species = case_when( n < 20 ~ "other",
-                              n >= 20 ~ species)) 
 
-seed_count <- type_count %>% 
-  filter(general_type == "Seed & Fruit Eaters",
-         location %in% c("Devereux Slough","DEVEREUX SLOUGH")) %>% 
-  select(!general_type) 
+seed_species_NCOS <- species_count %>% 
+  select_type_location(type="Seed & Fruit Eaters", region1="NCOS") %>% 
+  count_thresh(max=20)
 
+seed_count_DEV <- type_count %>% 
+  select_type_location(type="Seed & Fruit Eaters", region1="DEV") 
 
-ggplot(seed_species) + 
-    geom_bar(position="stack", stat="identity", aes(fill=species, y=n, x=observation_date))+
-      scale_fill_manual(values = c("#4E84C4", "#C4961A", "azure3", "#D16103","#C3D7A4"))+
-    geom_line(data=seed_count, aes(x=observation_date, y=n, col=location))+
-      scale_colour_grey()+
+# --------------------------------------------------------------------
+
+ggplot() + 
+    geom_bar( data = seed_species_NCOS,
+             position="stack", 
+             stat="identity", 
+             aes(fill=species, y=n, x=observation_date))+
+    scale_fill_manual(values = c("#4E84C4", "#C4961A", "azure3", "#D16103","#C3D7A4"))+
+    geom_line(data=seed_count_DEV, 
+              aes(x=observation_date, y=n, col=region))+
+    scale_colour_grey()+
   labs(title="Seed and Fruit Eaters at NCOS (09/2017-08/2019)",
        y = "number of individuals registered (n)")+
   theme_light()+
@@ -160,72 +193,85 @@ ggplot(seed_species) +
 
 ```
 
-**Graph 3.** Other species had a count of less than 20 on a given date.
+**Graph 3.** Other species had a count of less than 20 individuals on a given date.
 
 <br>
 <br>
 
-**Table 1.** Seed and fruit eaters registered at Deveroux Slough
-```{r}
-species_count %>% filter(location == "DEVEREUX SLOUGH", general_type == "Seed & Fruit Eaters") 
-```
-
----
+### Omnivores
 
 ```{r}
 
-omnivores_species <- species_count %>% 
-    filter(location == "NCOS") %>% 
-  filter(general_type == "Omnivores") %>% 
-  mutate(species = case_when( n < 10 ~ "other",
-                              n >= 10 ~ species)) 
+omnivores_species_NCOS <- species_count %>% 
+  select_type_location(type="Omnivores", region1="NCOS") %>% 
+  count_thresh(max=10)
 
+omnivores_count_DEV <- type_count %>% 
+  select_type_location(type="Omnivores", region1="DEV") 
 
-omnivores_count <- type_count %>% 
-  filter(general_type == "Omnivores",
-         location %in% c("Devereux Slough","DEVEREUX SLOUGH")) %>% 
-  select(!general_type) 
+# --------------------------------------------------------------------
 
-
-
-ggplot(omnivores_species) + 
-    geom_bar(position="stack", stat="identity", aes(fill=species, y=n, x=observation_date))+
-      scale_fill_manual(values = c("#4E84C4", "#C4961A", "#D16103","azure3"))+
-    geom_line(data=omnivores_count, aes(x=observation_date, y=n, col=location))+
-      scale_colour_grey()+
-  labs(title="Omnivores at NCOS (09/2017-08/2019)",
-       y = "number of individuals registered (n)")+
-  theme_light()+
-  theme( # remove the vertical grid lines
+ggplot(omnivores_species_NCOS) + 
+    geom_bar(position="stack", 
+             stat="identity", 
+             aes(fill=species, y=n, x=observation_date))+
+    scale_fill_manual(values = c("#4E84C4", "#C4961A", "#D16103","azure3"))+
+    geom_line(data=omnivores_count_DEV, 
+              aes(x=observation_date, y=n, col=region))+
+    scale_colour_grey()+
+    labs(title="Omnivores at NCOS (09/2017-08/2019)",
+         y = "number of individuals registered (n)")+
+    theme_light()+
+    theme( # remove the vertical grid lines
            panel.grid.major.x = element_blank() ,
            panel.grid.minor.x = element_blank() ,
     )
 
 ```
 
-**Graph 4.** Other species had a count of less than 10 on a given date.
+**Graph 4.** Other species had a count of less than 10 individuals on a given date.
 
-<br>
-<br>
 
-**Table 2.**  Omnivores registered at Deveroux Slough
-```{r}
-species_count %>% filter(location == "DEVEREUX SLOUGH", general_type == "Omnivores") 
+## Species Richness
+
+
+### Total
+
+```{r, include=TRUE}
+# ----- Species Richness Analysis in Dev and NCOS -----
+richness <- species_count %>% 
+  count(region, observation_date) %>% 
+  as_tsibble(key=region ,index=observation_date)
+
+
+ggplot(data=richness, 
+       aes(x=observation_date, y=n)) +
+  geom_line(aes(col=region))+
+  theme_light()+
+  theme(axis.text.x = element_text(angle = 60, hjust = 1)) +
+  labs(title="Species richness at Deveroux Slough and NCOS (2017-2019)",
+       x="observation date",
+       y= "number of species registered (n)")+
+  theme(legend.position="bottom")
+
 ```
 
-```{r, include=FALSE}
 
-#Checking crow counts in "8/22/2018"
+### By type
 
-# crows_0718 <- post_survey_data %>% 
-#   filter(location == "NCOS", 
-#          species == "American Crow",
-#          observation_date == "8/22/2018")
+```{r}
+# ----- Species Richness Analysis, by type in Dev and NCOS -----
 
+richness_by_type <- species_count %>% 
+  count(region, observation_date, general_type) 
 
-# crows_0718_count <- species_count %>% 
-#   filter(location == "NCOS", 
-#          species_and_type == "American Crow*Omnivores",
-#          year(observation_date) == 2018,
-#          month(observation_date) == 8)
+ggplot(data= richness_by_type, aes(x=observation_date, y=n)) +
+  geom_line(aes(col=region))+
+  facet_wrap(~general_type) +
+  theme_light()+
+  theme(axis.text.x = element_text(angle = 60, hjust = 1)) +
+  labs(title="Species richness at Deveroux Slough and NCOS (2017-2019)",
+       x="observation date",
+       y= "number of species registered (n)")+
+  theme(legend.position="bottom")
 ```
