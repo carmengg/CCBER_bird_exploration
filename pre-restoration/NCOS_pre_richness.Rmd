@@ -1,0 +1,48 @@
+---
+title: "NCOS/Devereoux Slough 2017-2019 bird survey exploration"
+author: "Carmen Galaz-García"
+date: "4/15/2021"
+output: 
+  html_document:
+    #toc: true  # make a table of contents
+    #toc_float: true  # table of contents as sidebar
+    #number_sections: true  
+    code_folding: hide  # makes hide/show for code---
+
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(here)
+library(janitor)
+library(lubridate)
+library(tsibble)
+
+```
+
+
+
+```{r, include=FALSE}
+pre_survey_data <- read.csv(here('CCBER_data_and_script_files','survey_data.csv')) %>%
+  clean_names()
+
+```
+
+```{r, include = FALSE}
+# all CCBER observations have 
+#    confidence = 2, 
+#    present_absent = P or yes
+#    num_locations = 1
+
+ccber_surveys <- pre_survey_data %>% 
+  mutate(date = mdy(date)) %>% 
+  filter(source1 == "CCBER") %>% 
+  select(unique_id:date,
+         location1, 
+         total_count,
+         bbl_code,
+         source1,source2) 
+  
+```
+
