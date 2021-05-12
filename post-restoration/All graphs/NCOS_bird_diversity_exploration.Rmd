@@ -275,3 +275,13 @@ ggplot(data= richness_by_type, aes(x=observation_date, y=n)) +
        y= "number of species registered (n)")+
   theme(legend.position="bottom")
 ```
+
+
+
+```{r}
+mourning_doves <- post_survey_data %>% 
+  filter(species == "Mourning Dove",
+         location == "NCOS", 
+         observation_date == "10/30/2017")
+```
+

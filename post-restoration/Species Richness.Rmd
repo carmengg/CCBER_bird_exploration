@@ -1,0 +1,91 @@
+---
+title: "Species Richness"
+author: "Carmen Galaz-García"
+date: "4/30/2021"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(tidyverse)
+library(here)
+library(janitor)
+library(lubridate)
+library(tsibble)
+
+
+post_survey_data <- read.csv(here('data','COPR_NCOS_Bird_Survey_Data_Aug2017_Aug2019.csv')) %>% 
+  clean_names()
+
+```
+
+
+
+```{r}
+# DATA SELECTION
+# Select post-restoration data with desired variables
+post_restoration <- post_survey_data %>% 
+  mutate(observation_date = lubridate::mdy(observation_date)) %>% # convert to date format
+  mutate(location = replace(location, location=="Devereux Slough", "DEVEREUX SLOUGH")) %>% 
+  filter( 2016 <= year(observation_date),
+          location %in% c("DEVEREUX SLOUGH", "NCOS"))%>%                     
+  select(observation_date, 
+         location,
+         species,
+         general_type,
+         count) 
+
+
+# -------------------------------------------------------------------------------
+# Count number of individuals per species, observation date and location
+# Keep associated general type
+species_count <- post_restoration %>% 
+  unite("species_and_type", species, general_type, sep="*") %>% 
+  count(observation_date,location, species_and_type,
+        wt=count) %>% 
+  separate(species_and_type, c("species","general_type"), sep="([*])") 
+
+
+```
+
+
+
+```{r, include=TRUE}
+# ----- Species Richness Analysis in Dev and NCOS -----
+richness <- species_count %>% 
+  count(location, observation_date) %>% 
+  as_tsibble(key=location ,index=observation_date)
+
+
+ggplot(data= richness, aes(x=observation_date, y=n)) +
+  geom_line(aes(col=location))+
+#  facet_wrap(~general_type) +
+  theme_light()+
+  theme(axis.text.x = element_text(angle = 60, hjust = 1)) +
+  labs(title="Species richness at Deveroux Slough and NCOS (2017-2019)",
+       x="observation date",
+       y= "number of species registered (n)")+
+  theme(legend.position="bottom")
+
+```
+
+```{r}
+# ----- Species Richness Analysis, by type in Dev and NCOS -----
+
+richness_by_type <- species_count %>% 
+  count(location, observation_date, general_type) 
+  #as_tsibble(key=general_type ,index=observation_date)
+
+ggplot(data= richness_by_type, aes(x=observation_date, y=n)) +
+  geom_line(aes(col=location))+
+  facet_wrap(~general_type) +
+  theme_light()+
+  theme(axis.text.x = element_text(angle = 60, hjust = 1)) +
+  labs(title="Species richness at Deveroux Slough and NCOS (2017-2019)",
+       x="observation date",
+       y= "number of species registered (n)")+
+  theme(legend.position="bottom")
+```
+

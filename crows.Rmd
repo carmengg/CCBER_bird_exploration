@@ -1,0 +1,70 @@
+---
+title: "Crows"
+author: "Carmen Galaz-García"
+date: "5/6/2021"
+output: html_document
+---
+---
+title: "NCOS Bird Diversity Exploration"
+author: "Carmen Galaz-García"
+date: "5/5/2021"
+output: 
+  html_document:
+    toc: true  # make a table of contents
+    toc_float: true  # table of contents as sidebar
+    #number_sections: true  
+    code_folding: hide  # makes hide/show for code---
+
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(here)
+library(janitor)
+library(lubridate)
+library(tsibble)
+library(stringr)
+
+# raw data
+post_survey_data <- read.csv(here('data','COPR_NCOS_Bird_Survey_Data_Aug2017_Aug2019.csv')) %>% 
+  clean_names()
+
+```
+
+
+```{r}
+# ------------------- DATA SELECTION ------------------------
+
+post_restoration <- post_survey_data %>% 
+  # --- date formatting and selection ---
+  mutate(observation_date = lubridate::mdy(observation_date)) %>%
+  filter( 2016 <= year(observation_date)) %>% 
+  # --- location formatting and selection ---
+  mutate(location = replace(location, location =="Devereux Slough", "DEVEREUX SLOUGH")) %>% 
+  filter(!(location %in% c("BEACH SOUTH", "BEACH NORTH", "OUT OF POLYGON"))) %>% 
+  mutate(region = case_when( location == "NCOS" ~ "NCOS",
+                              location != "NCOS" ~ "DEV" )) %>% 
+  # --- column simplification ---
+  select(observation_date, 
+         species,
+         general_type,
+         count,
+         region) 
+```
+
+```{r, include=FALSE}
+# CROWS
+crows <- post_restoration %>% 
+  filter(species == "American Crow") %>% 
+  select(observation_date,count,region) %>% 
+  count(observation_date,region, wt=count) %>% 
+  mutate(month= ym(observation_date))
+
+
+ggplot(data= crows, aes(x=observation_date, y=n, fill=region)) +
+  #geom_line()+
+  geom_bar(stat="identity", position="dodge", width=4)+
+  theme_light()
+  
+```
