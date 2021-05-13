@@ -64,11 +64,41 @@ omg_birds <- ccber_surveys %>%
   left_join(y=bird_types, by = c("common_name" = "species"))
 
 
+# ---- check which remain with NA name or NA type
 no_name <- omg_birds %>% 
   filter(is.na(common_name))
+
 no_type <- omg_birds %>% 
   filter(is.na(general_type))
 
+```
+
+
+```{r}
+# -------- TYPE ABUNDANCE ----------------
+# Count number of individuals per type and observation (all NCOS data)
+type_count <- omg_birds %>% 
+  select(date, total_count, general_type) %>% 
+  count(date, general_type, 
+        wt=total_count)
+
+# ------- GRAPH ------
+
+ggplot(data= type_count, aes(x=date, y=n)) +
+  geom_line()+
+  facet_wrap(~general_type) +
+  theme_light()+
+  theme(axis.text.x = element_text(angle = 60, hjust = 1)) +
+  labs(title="Monthly bird counts at NCOS grouping by general type",
+       x="observation date",
+       y= "number of individuals registered (n)")
+
+```
+
+
+```{r}
+ccber1314 <- pre_survey_data %>% 
+  filter(source1=="CCBER", year>= 2013)
 
 ```
 
