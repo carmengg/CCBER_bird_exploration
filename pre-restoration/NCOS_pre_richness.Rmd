@@ -30,10 +30,13 @@ pre_survey_data <- read.csv(here('CCBER_data_and_script_files','survey_data.csv'
 ```
 
 ```{r, include = FALSE}
+# ---- DATA SELECTION ----
+# selecting all CCBER observations for Oceand Meadows Golf Course
 # all CCBER observations have 
 #    confidence = 2, 
 #    present_absent = P or yes
-#    num_locations = 1
+#    num_locations = 1 
+#    location2, location3, location 4 = NA
 
 ccber_surveys <- pre_survey_data %>% 
   mutate(date = mdy(date)) %>% 
@@ -42,7 +45,30 @@ ccber_surveys <- pre_survey_data %>%
          location1, 
          total_count,
          bbl_code,
-         source1,source2) 
-  
+         source1,source2) %>% 
+  filter(location1 == "OMG") %>% 
+  select(!location1) %>% 
+  select(unique_id:bbl_code)
+
+# ----- Adding bird common names from bbl_codes ----
+
+bbl_codes <- read_csv(here("BBL_codes.csv")) %>% 
+  clean_names() %>% 
+  select(!common_name_aka)
+
+bird_types <- read_csv(here("bird_types.csv")) %>% 
+  select(!e_bird_group)
+
+omg_birds <- ccber_surveys %>% 
+  left_join(y=bbl_codes,by="bbl_code") %>% 
+  left_join(y=bird_types, by = c("common_name" = "species"))
+
+
+no_name <- omg_birds %>% 
+  filter(is.na(common_name))
+no_type <- omg_birds %>% 
+  filter(is.na(general_type))
+
+
 ```
 

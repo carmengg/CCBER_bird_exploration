@@ -285,3 +285,13 @@ mourning_doves <- post_survey_data %>%
          observation_date == "10/30/2017")
 ```
 
+```{r, include=FALSE}
+# ----- exporting list of bird types ----
+types <- post_survey_data %>% 
+  select(species:e_bird_group) %>% 
+  count(species, general_type, e_bird_group) %>% 
+  select(!n)
+
+write.csv(types, file=here("bird_types.csv"),row.names = FALSE )
+```
+
