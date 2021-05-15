@@ -231,6 +231,40 @@ ggplot(omnivores_species_NCOS) +
 
 **Graph 4.** Other species had a count of less than 10 individuals on a given date.
 
+### Waterfowl & friends
+
+```{r}
+
+water_species_NCOS <- species_count %>% 
+  select_type_location(type="Waterfowl & Friends", region1="NCOS") %>% 
+  count_thresh(max=20)
+
+water_count_DEV <- type_count %>% 
+  select_type_location(type="Waterfowl & Friends", region1="DEV") 
+
+# --------------------------------------------------------------------
+
+ggplot() + 
+    geom_bar( data = water_species_NCOS,
+             position="stack", 
+             stat="identity", 
+             aes(fill=species, y=n, x=observation_date))+
+    scale_fill_manual(values = c("#4E84C4", "#C4961A", "chartreuse4", "#D16103","azure3"))+
+    geom_line(data=water_count_DEV, 
+              aes(x=observation_date, y=n, col=region))+
+    scale_colour_grey()+
+  labs(title="Waterfowl & Friends at NCOS (09/2017-08/2019)",
+       y = "number of individuals registered (n)")+
+  theme_light()+
+  theme( # remove the vertical grid lines
+           panel.grid.major.x = element_blank() ,
+           panel.grid.minor.x = element_blank() ,
+    )
+
+rm(water_species_NCOS)
+rm(water_species_DEV)
+```
+
 
 ## Species Richness
 
@@ -278,7 +312,7 @@ ggplot(data= richness_by_type, aes(x=observation_date, y=n)) +
 
 
 
-```{r}
+```{r, include=FALSE}
 mourning_doves <- post_survey_data %>% 
   filter(species == "Mourning Dove",
          location == "NCOS", 

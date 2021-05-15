@@ -12,7 +12,7 @@ output:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning=FALSE)
 library(tidyverse)
 library(here)
 library(janitor)
@@ -24,12 +24,16 @@ library(tsibble)
 
 
 ```{r, include=FALSE}
+# ---- RAW DATA ----
 pre_survey_data <- read.csv(here('CCBER_data_and_script_files','survey_data.csv')) %>%
-  clean_names()
+  clean_names() %>% 
+  mutate(date = mdy(date))
 
 ```
 
-```{r, include = FALSE}
+## Data selection 
+
+```{r}
 # ---- DATA SELECTION ----
 # selecting all CCBER observations for Oceand Meadows Golf Course
 # all CCBER observations have 
@@ -39,7 +43,6 @@ pre_survey_data <- read.csv(here('CCBER_data_and_script_files','survey_data.csv'
 #    location2, location3, location 4 = NA
 
 ccber_surveys <- pre_survey_data %>% 
-  mutate(date = mdy(date)) %>% 
   filter(source1 == "CCBER") %>% 
   select(unique_id:date,
          location1, 
@@ -59,25 +62,38 @@ bbl_codes <- read_csv(here("BBL_codes.csv")) %>%
 bird_types <- read_csv(here("bird_types.csv")) %>% 
   select(!e_bird_group)
 
-omg_birds <- ccber_surveys %>% 
+ncos_birds <- ccber_surveys %>% 
   left_join(y=bbl_codes,by="bbl_code") %>% 
   left_join(y=bird_types, by = c("common_name" = "species"))
 
+rm(bbl_codes)
+rm(bird_types)
+
 
 # ---- check which remain with NA name or NA type
-no_name <- omg_birds %>% 
-  filter(is.na(common_name))
-
-no_type <- omg_birds %>% 
-  filter(is.na(general_type))
+# no_name <- omg_birds %>% 
+#   filter(is.na(common_name))
+# 
+# no_type <- omg_birds %>% 
+#   filter(is.na(general_type))
 
 ```
 
 
+
+```{r, include=FALSE}
+ccber1314 <- pre_survey_data %>% 
+  filter(source1=="CCBER", year>= 2013)
+rm(ccber1314)
+```
+
+
+## Abundance by type
+
 ```{r}
 # -------- TYPE ABUNDANCE ----------------
 # Count number of individuals per type and observation (all NCOS data)
-type_count <- omg_birds %>% 
+type_count <- ncos_birds %>% 
   select(date, total_count, general_type) %>% 
   count(date, general_type, 
         wt=total_count)
@@ -95,10 +111,182 @@ ggplot(data= type_count, aes(x=date, y=n)) +
 
 ```
 
+```{r}
+# ------- SPECIES ABUNDANCE ----------
+
+# Count number of individuals per species and observation date in NCOS
+# Keeps associated general type and location
+species_count <- ncos_birds %>% 
+  unite("species_and_type", common_name, general_type, sep="*") %>% 
+  select(date, total_count, species_and_type) %>% 
+  count(date, species_and_type,
+        wt=total_count) %>% 
+  separate(species_and_type, c("species","general_type"), sep="([*])") 
+```
+
+
 
 ```{r}
-ccber1314 <- pre_survey_data %>% 
-  filter(source1=="CCBER", year>= 2013)
+# --- Insectivores by species ---
 
+max <- 25
+insect <- species_count %>% 
+  filter(general_type == "Insectivores") %>% 
+    mutate(species = case_when( n < max ~ "other",
+                              n >= max ~ species)) 
+
+ggplot() + 
+  # --- NCOS count by species ---
+    geom_bar(data = insect,
+             position="stack", 
+             stat="identity", 
+             aes(fill=species, y=n, x=date))+
+    scale_fill_manual(values = c("#FFDB6D", "#C4961A", "#D16103","yellow","azure3", 
+                "#C3D7A4", "#52854C", "red","#4E84C4", "darkorchid"))+
+  # --- themes ---
+    labs(title="Insectivores at NCOS (08/2011-08/2012)",
+         y = "number of individuals registered (n)") +
+    theme_light()+
+    theme( # remove the vertical grid lines
+           panel.grid.major.x = element_blank() ,
+           panel.grid.minor.x = element_blank() ,
+    )
+rm(insect)
+```
+
+```{r}
+# --- Seed eaters by species ---
+
+max <- 20
+seeds <- species_count %>% 
+  filter(general_type == "Seed & Fruit Eaters") %>% 
+    mutate(species = case_when( n < max ~ "other",
+                              n >= max ~ species)) 
+
+ggplot() + 
+  # --- NCOS count by species ---
+    geom_bar(data = seeds,
+             position="stack", 
+             stat="identity", 
+             aes(fill=species, y=n, x=date))+
+        scale_fill_manual(values = c("#4E84C4", "#C4961A", "#C3D7A4", "azure3", "#D16103"))+
+  # --- themes ---
+    labs(title="Seed & Fruit Eaters at NCOS (08/2011-08/2012)",
+         y = "number of individuals registered (n)") +
+    theme_light()+
+    theme( # remove the vertical grid lines
+           panel.grid.major.x = element_blank() ,
+           panel.grid.minor.x = element_blank() ,
+    )
+rm(seeds)
+```
+
+```{r}
+# --- Omnivores by species ---
+
+max <- 10
+omnis <- species_count %>% 
+  filter(general_type == "Omnivores") %>% 
+    mutate(species = case_when( n < max ~ "other",
+                              n >= max ~ species)) 
+
+ggplot() + 
+  # --- NCOS count by species ---
+    geom_bar(data = omnis,
+             position="stack", 
+             stat="identity", 
+             aes(fill=species, y=n, x=date))+
+        scale_fill_manual(values = c("#4E84C4", "chartreuse4", "#C4961A", "#D16103","azure3"))+
+  # --- themes ---
+    labs(title="Omnivores at NCOS (08/2011-08/2012)",
+         y = "number of individuals registered (n)") +
+    theme_light()+
+    theme( # remove the vertical grid lines
+           panel.grid.major.x = element_blank() ,
+           panel.grid.minor.x = element_blank() ,
+    )
+rm(omnis)
+```
+
+
+```{r}
+# --- Waterfowl & Friends by species ---
+
+max <- 20
+wfl <- species_count %>% 
+  filter(general_type == "Waterfowl & Friends") %>% 
+    mutate(species = case_when( n < max ~ "other",
+                              n >= max ~ species)) 
+
+ggplot() + 
+  # --- NCOS count by species ---
+    geom_bar(data = wfl,
+             position="stack", 
+             stat="identity", 
+             aes(fill=species, y=n, x=date))+
+    scale_fill_manual(values = c("#4E84C4", "#C4961A", "#D16103","azure3"))+
+  # --- themes ---
+    labs(title="Waterfowl & Friends at NCOS (08/2011-08/2012)",
+         y = "number of individuals registered (n)") +
+    theme_light()+
+    theme( # remove the vertical grid lines
+           panel.grid.major.x = element_blank() ,
+           panel.grid.minor.x = element_blank() ,
+    )
+rm(wfl)
+```
+
+
+
+
+## Species richness
+
+
+```{r, include=TRUE}
+# ----- Species Richness Analysis in NCOS -----
+richness <- species_count %>% 
+  count(date) 
+  #as_tsibble(key=region ,index=observation_date)
+
+
+ggplot(data=richness, 
+       aes(x=date, y=n)) +
+  geom_line()+
+  theme_light()+
+  theme(axis.text.x = element_text(angle = 60, hjust = 1)) +
+  labs(title="Species Richness at Deveroux Slough and NCOS (2011-2012)",
+       x="observation date",
+       y= "number of species registered (n)")+
+  theme(legend.position="bottom")
+
+```
+```{r, include=FALSE}
+# --- COOTS ---
+
+coots <- pre_survey_data %>% 
+  filter(source1== "CCBER",
+         location1 == "OMG",
+         bbl_code == "AMCO")
+
+ggplot( data = coots, aes(x=date, y = total_count))+
+  geom_line()
+```
+### By type
+
+```{r}
+# ----- Species Richness Analysis, by type in Dev and NCOS -----
+
+richness_by_type <- species_count %>% 
+  count(date, general_type) 
+
+ggplot(data= richness_by_type, aes(x=date, y=n)) +
+  geom_line()+
+  facet_wrap(~general_type) +
+  theme_light()+
+  theme(axis.text.x = element_text(angle = 60, hjust = 1)) +
+  labs(title="Species richness at NCOS (2011-2012)",
+       x="observation date",
+       y= "number of species registered (n)")+
+  theme(legend.position="bottom")
 ```
 
