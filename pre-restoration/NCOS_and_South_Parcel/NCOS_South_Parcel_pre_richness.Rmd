@@ -31,11 +31,26 @@ pre_survey_data <- read.csv(here('CCBER_data_and_script_files','survey_data.csv'
 
 ```
 
+
+
 ## Data selection 
 
 ```{r}
+# ----- Bird common names from bbl_codes ----
+
+bbl_codes <- read_csv(here("BBL_codes.csv")) %>% 
+  clean_names() %>% 
+  select(!common_name_aka)
+
+bird_types <- read_csv(here("bird_types.csv")) %>% 
+  select(!e_bird_group)
+```
+
+
+```{r}
 # ---- DATA SELECTION ----
-# selecting all CCBER observations for Oceand Meadows Golf Course
+# selecting all CCBER observations for 
+#     Ocean Meadows Golf Course AND South Parcel
 # all CCBER observations have 
 #    confidence = 2, 
 #    present_absent = P or yes
@@ -44,26 +59,12 @@ pre_survey_data <- read.csv(here('CCBER_data_and_script_files','survey_data.csv'
 
 ccber_surveys <- pre_survey_data %>% 
   filter(source1 == "CCBER") %>% 
-  select(unique_id:date,
+  select(date,
          location1, 
          total_count,
-         bbl_code,
-         source1,source2) %>% 
-  filter(location1 == "OMG") %>% 
-  select(!location1) %>% 
-  select(unique_id:bbl_code)
-
-# ----- Adding bird common names from bbl_codes ----
-
-bbl_codes <- read_csv(here("BBL_codes.csv")) %>% 
-  clean_names() %>% 
-  select(!common_name_aka)
-
-bird_types <- read_csv(here("bird_types.csv")) %>% 
-  select(!e_bird_group)
-
-ncos_birds <- ccber_surveys %>% 
-  left_join(y=bbl_codes,by="bbl_code") %>% 
+         bbl_code) %>% 
+  filter(location1 %in% c("OMG","SP")) %>%
+  left_join(y=bbl_codes,by="bbl_code") %>%    # --- add common names
   left_join(y=bird_types, by = c("common_name" = "species"))
 
 rm(bbl_codes)
@@ -71,21 +72,15 @@ rm(bird_types)
 
 
 # ---- check which remain with NA name or NA type
-# no_name <- omg_birds %>% 
+# no_name <-  ccber_surveys %>% 
 #   filter(is.na(common_name))
 # 
-# no_type <- omg_birds %>% 
+# no_type <- ccber_surveys %>% 
 #   filter(is.na(general_type))
 
 ```
 
 
-
-```{r, include=FALSE}
-ccber1314 <- pre_survey_data %>% 
-  filter(source1=="CCBER", year>= 2013)
-rm(ccber1314)
-```
 
 
 ## Abundance by type
@@ -93,14 +88,30 @@ rm(ccber1314)
 ```{r}
 # -------- TYPE ABUNDANCE ----------------
 # Count number of individuals per type and observation (all NCOS data)
-type_count <- ncos_birds %>% 
+type_count <- ccber_surveys %>% 
   select(date, total_count, general_type) %>% 
   count(date, general_type, 
-        wt=total_count)
+        wt=total_count) 
+
+month_type_count <- type_count %>% 
+  as_tsibble(key = general_type, index=date) %>% 
+  index_by( month =  ~yearmonth(.)) %>%   # group by month
+  group_by(general_type) %>% 
+  summarise(monthly_count = sum(n))
 
 # ------- GRAPH ------
 
 ggplot(data= type_count, aes(x=date, y=n)) +
+  geom_line()+
+  facet_wrap(~general_type) +
+  theme_light()+
+  theme(axis.text.x = element_text(angle = 60, hjust = 1)) +
+  labs(title="Monthly bird counts at NCOS grouping by general type",
+       x="observation date",
+       y= "number of individuals registered (n)")
+
+
+ggplot(data= month_type_count, aes(x=month, y=monthly_count)) +
   geom_line()+
   facet_wrap(~general_type) +
   theme_light()+
@@ -116,7 +127,7 @@ ggplot(data= type_count, aes(x=date, y=n)) +
 
 # Count number of individuals per species and observation date in NCOS
 # Keeps associated general type and location
-species_count <- ncos_birds %>% 
+species_count <- ccber_surveys %>% 
   unite("species_and_type", common_name, general_type, sep="*") %>% 
   select(date, total_count, species_and_type) %>% 
   count(date, species_and_type,
@@ -129,7 +140,7 @@ species_count <- ncos_birds %>%
 ```{r}
 # --- Insectivores by species ---
 
-max <- 25
+max <- 45
 insect <- species_count %>% 
   filter(general_type == "Insectivores") %>% 
     mutate(species = case_when( n < max ~ "other",
@@ -141,8 +152,8 @@ ggplot() +
              position="stack", 
              stat="identity", 
              aes(fill=species, y=n, x=date))+
-    scale_fill_manual(values = c("#FFDB6D", "#C4961A", "#D16103","yellow","azure3", 
-                "#C3D7A4", "#52854C", "red","#4E84C4", "darkorchid"))+
+    # scale_fill_manual(values = c("#FFDB6D", "#C4961A", "#D16103","yellow","azure3", 
+    #             "#C3D7A4", "#52854C", "red","#4E84C4", "darkorchid"))+
   # --- themes ---
     labs(title="Insectivores at NCOS (08/2011-08/2012)",
          y = "number of individuals registered (n)") +
