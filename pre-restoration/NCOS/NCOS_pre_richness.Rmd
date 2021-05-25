@@ -1,5 +1,5 @@
 ---
-title: "NCOS/Devereoux Slough 2017-2019 bird survey exploration"
+title: "NCOS/Devereoux Slough 2011-2012 bird survey exploration"
 author: "Carmen Galaz-García"
 date: "4/15/2021"
 output: 
@@ -254,7 +254,7 @@ ggplot(data=richness,
   geom_line()+
   theme_light()+
   theme(axis.text.x = element_text(angle = 60, hjust = 1)) +
-  labs(title="Species Richness at Deveroux Slough and NCOS (2011-2012)",
+  labs(title="Species Richness at Ocean Meadows Golf Course (2011-2012)",
        x="observation date",
        y= "number of species registered (n)")+
   theme(legend.position="bottom")

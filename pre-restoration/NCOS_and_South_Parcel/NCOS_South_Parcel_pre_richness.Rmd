@@ -1,5 +1,5 @@
 ---
-title: "NCOS/Devereoux Slough 2017-2019 bird survey exploration"
+title: "OMGC and South Parcel 2011-2013 bird survey exploration"
 author: "Carmen Galaz-García"
 date: "4/15/2021"
 output: 
@@ -19,23 +19,12 @@ library(janitor)
 library(lubridate)
 library(tsibble)
 
-```
-
-
-
-```{r, include=FALSE}
 # ---- RAW DATA ----
 pre_survey_data <- read.csv(here('CCBER_data_and_script_files','survey_data.csv')) %>%
   clean_names() %>% 
   mutate(date = mdy(date))
 
-```
 
-
-
-## Data selection 
-
-```{r}
 # ----- Bird common names from bbl_codes ----
 
 bbl_codes <- read_csv(here("BBL_codes.csv")) %>% 
@@ -93,25 +82,27 @@ type_count <- ccber_surveys %>%
   count(date, general_type, 
         wt=total_count) 
 
+# monthly counts
 month_type_count <- type_count %>% 
   as_tsibble(key = general_type, index=date) %>% 
   index_by( month =  ~yearmonth(.)) %>%   # group by month
   group_by(general_type) %>% 
-  summarise(monthly_count = sum(n))
+  #summarise(monthly_count = sum(n))
+  summarise(monthly_mean = mean(n))
 
 # ------- GRAPH ------
 
-ggplot(data= type_count, aes(x=date, y=n)) +
-  geom_line()+
-  facet_wrap(~general_type) +
-  theme_light()+
-  theme(axis.text.x = element_text(angle = 60, hjust = 1)) +
-  labs(title="Monthly bird counts at NCOS grouping by general type",
-       x="observation date",
-       y= "number of individuals registered (n)")
+# ggplot(data= type_count, aes(x=date, y=n)) +
+#   geom_line()+
+#   facet_wrap(~general_type) +
+#   theme_light()+
+#   theme(axis.text.x = element_text(angle = 60, hjust = 1)) +
+#   labs(title="Monthly bird counts at OMGC and South Parcel abundance by general type",
+#        x="observation date",
+#        y= "number of individuals registered (n)")
 
 
-ggplot(data= month_type_count, aes(x=month, y=monthly_count)) +
+ggplot(data= month_type_count, aes(x=month, y=monthly_mean)) +
   geom_line()+
   facet_wrap(~general_type) +
   theme_light()+
@@ -127,36 +118,66 @@ ggplot(data= month_type_count, aes(x=month, y=monthly_count)) +
 
 # Count number of individuals per species and observation date in NCOS
 # Keeps associated general type and location
-species_count <- ccber_surveys %>% 
+monthly_species_count <- ccber_surveys %>% 
   unite("species_and_type", common_name, general_type, sep="*") %>% 
   select(date, total_count, species_and_type) %>% 
+  # ---- add number of individuals from same species seen on same day
   count(date, species_and_type,
         wt=total_count) %>% 
+  # ---- month aggregation ---
+  as_tsibble(key = species_and_type, index=date) %>% 
+  index_by( month =  ~yearmonth(.)) %>%   # group by month
+  group_by(species_and_type) %>% 
+  #summarise(monthly_mean = mean(n)) %>% 
+  summarise(monthly_max = max(n)) %>% 
   separate(species_and_type, c("species","general_type"), sep="([*])") 
 ```
 
 
 
 ```{r}
+# ------- FILTERING FUNCTIONS --------
+
+# ------ type and location selection  ----
+select_type_location <- function(data,type,region1){
+  subset <- data %>% 
+    filter(general_type == type)
+  if(region1 != "both"){
+    subset %>% filter(region == region1)
+  }
+  return(subset)
+}
+
+# ----- high count thresholhd -----
+replace_species_by_other <- function(data,threshold,column_name){
+  new_data <- data %>% 
+    mutate(species = case_when( data[column_name] < threshold ~ "other",
+                                data[column_name]  >= threshold ~ species)) 
+  return(new_data)
+}
+
+```
+
+
+```{r}
 # --- Insectivores by species ---
 
-max <- 45
-insect <- species_count %>% 
-  filter(general_type == "Insectivores") %>% 
-    mutate(species = case_when( n < max ~ "other",
-                              n >= max ~ species)) 
+thresh <- 25
+insect <- monthly_species_count %>% 
+  select_type_location(type="Insectivores", region1="both") %>% 
+  replace_species_by_other(threshold = thresh,column_name = "monthly_max")
 
 ggplot() + 
   # --- NCOS count by species ---
     geom_bar(data = insect,
              position="stack", 
              stat="identity", 
-             aes(fill=species, y=n, x=date))+
-    # scale_fill_manual(values = c("#FFDB6D", "#C4961A", "#D16103","yellow","azure3", 
-    #             "#C3D7A4", "#52854C", "red","#4E84C4", "darkorchid"))+
+             aes(fill=species, y=monthly_max, x=month))+
+    scale_fill_manual(values = c("#FFDB6D", "#C4961A", "#D16103","yellow","azure3", 
+                "#C3D7A4", "blue","#52854C", "darkgreen","red","#4E84C4", "darkorchid"))+
   # --- themes ---
-    labs(title="Insectivores at NCOS (08/2011-08/2012)",
-         y = "number of individuals registered (n)") +
+    labs(title="Insectivores at NCOS (08/2011-09/2013)",
+         y = "maximum of individuals registered (n)") +
     theme_light()+
     theme( # remove the vertical grid lines
            panel.grid.major.x = element_blank() ,
@@ -165,25 +186,27 @@ ggplot() +
 rm(insect)
 ```
 
+
+
+
 ```{r}
 # --- Seed eaters by species ---
 
-max <- 20
-seeds <- species_count %>% 
-  filter(general_type == "Seed & Fruit Eaters") %>% 
-    mutate(species = case_when( n < max ~ "other",
-                              n >= max ~ species)) 
+thresh <- 20
+seeds <- monthly_species_count %>% 
+  select_type_location(type="Seed & Fruit Eaters", region1="both") %>% 
+  replace_species_by_other(threshold = thresh,column_name = "monthly_max")
 
 ggplot() + 
   # --- NCOS count by species ---
     geom_bar(data = seeds,
              position="stack", 
              stat="identity", 
-             aes(fill=species, y=n, x=date))+
-        scale_fill_manual(values = c("#4E84C4", "#C4961A", "#C3D7A4", "azure3", "#D16103"))+
+             aes(fill=species,x=month, y=monthly_max,))+
+        scale_fill_manual(values = c(  "#D16103","#4E84C4","#C3D7A4", "#C4961A", "azure3"))+
   # --- themes ---
-    labs(title="Seed & Fruit Eaters at NCOS (08/2011-08/2012)",
-         y = "number of individuals registered (n)") +
+    labs(title="Seed & Fruit Eaters at OMGC and South Parcel (08/2011-09/2013)",
+         y = "maximum of individuals registered (n)") +
     theme_light()+
     theme( # remove the vertical grid lines
            panel.grid.major.x = element_blank() ,
@@ -195,22 +218,22 @@ rm(seeds)
 ```{r}
 # --- Omnivores by species ---
 
-max <- 10
-omnis <- species_count %>% 
-  filter(general_type == "Omnivores") %>% 
-    mutate(species = case_when( n < max ~ "other",
-                              n >= max ~ species)) 
+thresh <- 10
+omnis <- monthly_species_count %>% 
+  select_type_location(type="Omnivores", region1="both") %>% 
+  replace_species_by_other(threshold = thresh,column_name = "monthly_max")
+
 
 ggplot() + 
   # --- NCOS count by species ---
     geom_bar(data = omnis,
              position="stack", 
              stat="identity", 
-             aes(fill=species, y=n, x=date))+
-        scale_fill_manual(values = c("#4E84C4", "chartreuse4", "#C4961A", "#D16103","azure3"))+
+             aes(fill=species, y=monthly_max, x=month))+
+        scale_fill_manual(values = c("#4E84C4", "chartreuse4", "#C4961A", "#D16103","darkorchid","azure3"))+
   # --- themes ---
-    labs(title="Omnivores at NCOS (08/2011-08/2012)",
-         y = "number of individuals registered (n)") +
+    labs(title="Omnivores at OMGC and South Parcel (08/2011-09/2013)",
+         y = "maximum of individuals registered (n)") +
     theme_light()+
     theme( # remove the vertical grid lines
            panel.grid.major.x = element_blank() ,
@@ -223,21 +246,21 @@ rm(omnis)
 ```{r}
 # --- Waterfowl & Friends by species ---
 
-max <- 20
-wfl <- species_count %>% 
-  filter(general_type == "Waterfowl & Friends") %>% 
-    mutate(species = case_when( n < max ~ "other",
-                              n >= max ~ species)) 
+thresh <- 20
+wfl <- monthly_species_count %>% 
+  select_type_location(type="Waterfowl & Friends", region1="both") %>% 
+  replace_species_by_other(threshold = thresh,column_name = "monthly_max")
+
 
 ggplot() + 
   # --- NCOS count by species ---
     geom_bar(data = wfl,
              position="stack", 
              stat="identity", 
-             aes(fill=species, y=n, x=date))+
+             aes(fill=species, y=monthly_max, x=month))+
     scale_fill_manual(values = c("#4E84C4", "#C4961A", "#D16103","azure3"))+
   # --- themes ---
-    labs(title="Waterfowl & Friends at NCOS (08/2011-08/2012)",
+    labs(title="Waterfowl & Friends at OMGC and South Parcel (08/2011-09/2013)",
          y = "number of individuals registered (n)") +
     theme_light()+
     theme( # remove the vertical grid lines
@@ -255,47 +278,36 @@ rm(wfl)
 
 ```{r, include=TRUE}
 # ----- Species Richness Analysis in NCOS -----
-richness <- species_count %>% 
-  count(date) 
-  #as_tsibble(key=region ,index=observation_date)
+richness <- monthly_species_count %>% 
+  count(month) 
 
 
 ggplot(data=richness, 
-       aes(x=date, y=n)) +
+       aes(x=month, y=n)) +
   geom_line()+
   theme_light()+
   theme(axis.text.x = element_text(angle = 60, hjust = 1)) +
-  labs(title="Species Richness at Deveroux Slough and NCOS (2011-2012)",
-       x="observation date",
+  labs(title="Species Richness at OMGC and South Parcel (2011-2013)",
+       x="month",
        y= "number of species registered (n)")+
   theme(legend.position="bottom")
 
 ```
-```{r, include=FALSE}
-# --- COOTS ---
 
-coots <- pre_survey_data %>% 
-  filter(source1== "CCBER",
-         location1 == "OMG",
-         bbl_code == "AMCO")
-
-ggplot( data = coots, aes(x=date, y = total_count))+
-  geom_line()
-```
 ### By type
 
 ```{r}
 # ----- Species Richness Analysis, by type in Dev and NCOS -----
 
-richness_by_type <- species_count %>% 
-  count(date, general_type) 
+richness_by_type <- monthly_species_count %>% 
+  count(month, general_type) 
 
-ggplot(data= richness_by_type, aes(x=date, y=n)) +
+ggplot(data= richness_by_type, aes(x=month, y=n)) +
   geom_line()+
   facet_wrap(~general_type) +
   theme_light()+
   theme(axis.text.x = element_text(angle = 60, hjust = 1)) +
-  labs(title="Species richness at NCOS (2011-2012)",
+  labs(title="Species richness at OMGC and South Parcel (2011-2013)",
        x="observation date",
        y= "number of species registered (n)")+
   theme(legend.position="bottom")
