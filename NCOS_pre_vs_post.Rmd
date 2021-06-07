@@ -20,6 +20,10 @@ library(lubridate)
 library(tsibble)
 ```
 
+# About the data
+The pre-restoration data corresponds to CCBER surveys taking place in the South Parcel and Ocean Meadows Golf Course from July 2011 to August 2013.
+The post-restoration data corresponds to CCBER surveys taking place at North Campus Open Space from July 2011 to August 2013.
+## Data Selection
 
 ```{r}
 # ----- Bird common names from bbl_codes ----
@@ -67,6 +71,7 @@ pre_ccber_surveys <- raw_pre_surveys %>%
 
 rm(bbl_codes)
 rm(bird_types)
+rm(raw_pre_surveys)
 
 
 # ---- check which remain with NA name or NA type
@@ -101,4 +106,83 @@ post_ccber_surveys <- raw_post_surveys %>%
   rename(date = observation_date,
          common_name = species) %>% 
   relocate(count, .after=common_name)
+
+rm(raw_post_surveys)
 ```
+
+```{r, include=FALSE}
+
+
+#  -------- TYPE ABUNDANCE ----------------
+# Count number of individuals per type and observation (all NCOS data)
+# type_count <- all_surveys %>% 
+#   select(date, count, general_type) %>% 
+#   count(date, general_type, 
+#         wt=count) 
+# 
+# ggplot(data= type_count, aes(x=date, y=n)) +
+#   geom_line()+
+#   facet_wrap(~general_type) +
+#   theme_light()+
+#   theme(axis.text.x = element_text(angle = 60, hjust = 1)) +
+#   labs(title="Monthly bird counts at OMGC and South Parcel abundance by general type",
+#        x="observation date",
+#        y= "number of individuals registered (n)")
+```
+
+
+```{r, include = FALSE}
+# month_type_count <- type_count
+#   as_tsibble(key = general_type, index=date) %>% 
+#   index_by( month =  ~yearmonth(.)) %>%   # group by month
+#   group_by(general_type) %>% 
+#   #summarise(monthly_count = sum(n))
+#   summarise(monthly_mean = mean(n))
+
+# 
+# ggplot(data= month_type_count, aes(x=month, y=monthly_mean)) +
+#   geom_line()+
+#   facet_wrap(~general_type) +
+#   theme_light()+
+#   theme(axis.text.x = element_text(angle = 60, hjust = 1)) +
+#   labs(title="Average monthly bird counts at \nOMGC and South Parcel, grouping by general type",
+#        x="observation date",
+#        y= "average number of individuals registered ")
+```
+
+
+# Abundance by guild
+
+
+```{r}
+# Bind pre and post restoration surveys
+all_surveys <- bind_rows(pre_ccber_surveys,post_ccber_surveys) %>% 
+  filter(!is.na(general_type))
+general_types <- unique(all_surveys$general_type)
+
+type_graph <- function(dataf, gen_type){
+  type_count <- dataf %>% 
+    filter(general_type == gen_type) %>% 
+    select(date, count, general_type) %>% 
+    count(date, general_type, 
+        wt=count) 
+  
+  plot <- ggplot(data= type_count, aes(x=date, y=n)) +
+    geom_line()+
+    theme_light()+
+    theme(axis.text.x = element_text(angle = 60, hjust = 1)) +
+    labs(title= paste("Abundance of", gen_type, "guild at NCOS", sep=" "),
+         x="observation date",
+         y= "number of individuals registered (n)")  
+  
+  return(plot)  
+}
+
+
+for (i in general_types){
+  print(type_graph(all_surveys, i))
+}
+
+```
+
+
