@@ -1,0 +1,80 @@
+---
+title: "NCOS pre and post restoration bird survey analysis"
+author: "Carmen Galaz-García"
+date: "6/6/2021"
+output: 
+  html_document:
+    #toc: true  # make a table of contents
+    #toc_float: true  # table of contents as sidebar
+    #number_sections: true  
+    code_folding: hide  # makes hide/show for code---
+
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message=FALSE, warning=FALSE)
+library(tidyverse)
+library(here)
+library(janitor)
+library(lubridate)
+library(tsibble)
+```
+
+
+```{r}
+# ---- RAW SURVEYS DATA ----
+
+# --- pre-restoration data
+pre_survey_data <- read.csv(here('CCBER_data_and_script_files','survey_data.csv')) %>%
+  clean_names() %>% 
+  mutate
+
+
+
+```
+
+
+```{r}
+# ----- Bird common names from bbl_codes ----
+
+bbl_codes <- read_csv(here("BBL_codes.csv")) %>% 
+  clean_names() %>% 
+  select(!common_name_aka)
+
+bird_types <- read_csv(here("bird_types.csv")) %>% 
+  select(!e_bird_group)
+```
+
+
+```{r}
+# ---- DATA SELECTION ----
+# selecting all CCBER observations for 
+#     Ocean Meadows Golf Course AND South Parcel
+# all CCBER observations have 
+#    confidence = 2, 
+#    present_absent = P or yes
+#    num_locations = 1 
+#    location2, location3, location 4 = NA
+
+ccber_surveys <- pre_survey_data %>% 
+  filter(source1 == "CCBER") %>% 
+  select(date,
+         location1, 
+         total_count,
+         bbl_code) %>% 
+  filter(location1 %in% c("OMG","SP")) %>%
+  left_join(y=bbl_codes,by="bbl_code") %>%    # --- add common names
+  left_join(y=bird_types, by = c("common_name" = "species"))
+
+rm(bbl_codes)
+rm(bird_types)
+
+
+# ---- check which remain with NA name or NA type
+# no_name <-  ccber_surveys %>% 
+#   filter(is.na(common_name))
+# 
+# no_type <- ccber_surveys %>% 
+#   filter(is.na(general_type))
+
+```
