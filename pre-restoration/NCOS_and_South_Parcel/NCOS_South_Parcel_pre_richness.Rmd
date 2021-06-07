@@ -107,9 +107,9 @@ ggplot(data= month_type_count, aes(x=month, y=monthly_mean)) +
   facet_wrap(~general_type) +
   theme_light()+
   theme(axis.text.x = element_text(angle = 60, hjust = 1)) +
-  labs(title="Monthly bird counts at NCOS grouping by general type",
+  labs(title="Average monthly bird counts at \nOMGC and South Parcel, grouping by general type",
        x="observation date",
-       y= "number of individuals registered (n)")
+       y= "average number of individuals registered ")
 
 ```
 
@@ -131,8 +131,29 @@ monthly_species_count <- ccber_surveys %>%
   #summarise(monthly_mean = mean(n)) %>% 
   summarise(monthly_max = max(n)) %>% 
   separate(species_and_type, c("species","general_type"), sep="([*])") 
+
+# ----- species count with location
+monthly_species_count_location <- ccber_surveys %>% 
+  unite("species_and_type", common_name, general_type, sep="*") %>% 
+  select(date, location1, total_count, species_and_type) %>% 
+  # ---- add number of individuals from same species seen on same day
+  count(date, location1,species_and_type,
+        wt=total_count) %>% 
+  # ---- month aggregation ---
+  as_tsibble(key = species_and_type, index=date) %>% 
+  index_by( month =  ~yearmonth(.)) %>%   # group by month
+  group_by(species_and_type,location1) %>% 
+  #summarise(monthly_mean = mean(n)) %>% 
+  summarise(monthly_max = max(n)) %>% 
+  separate(species_and_type, c("species","general_type"), sep="([*])") 
+
 ```
 
+## Abundance in different groups
+
+The number of individuals of a given species during a single month was taken as the maximum number of individuals of that species recorded during any survey conducted in the given month. 
+The gray dots indicate the maximum number of individuals of a given type recorded in each month, both in Ocean Meadows Golf Course (OMG) or in the South Parcel (SP). 
+Notice that surveys for OCMG and SP overlap only on a few months. 
 
 
 ```{r}
@@ -167,23 +188,33 @@ insect <- monthly_species_count %>%
   select_type_location(type="Insectivores", region1="both") %>% 
   replace_species_by_other(threshold = thresh,column_name = "monthly_max")
 
+loc_insect <- monthly_species_count_location %>% 
+    select_type_location(type="Insectivores", region1="both") %>% 
+    group_by(location1,month) %>% 
+    summarise(max_count = sum(monthly_max))
+
 ggplot() + 
-  # --- NCOS count by species ---
+  # --- total max count by species ---
     geom_bar(data = insect,
              position="stack", 
              stat="identity", 
              aes(fill=species, y=monthly_max, x=month))+
     scale_fill_manual(values = c("#FFDB6D", "#C4961A", "#D16103","yellow","azure3", 
                 "#C3D7A4", "blue","#52854C", "darkgreen","red","#4E84C4", "darkorchid"))+
+  # ---- count by site ---
+    geom_point(data = loc_insect,
+              aes(col=location1, x=month, y=max_count))+
+    scale_colour_grey(start=0.1, end=0.4)+
   # --- themes ---
-    labs(title="Insectivores at NCOS (08/2011-09/2013)",
-         y = "maximum of individuals registered (n)") +
+    labs(title="Insectivores at OMGC and South Parcel (08/2011-09/2013)",
+         y = "maximum number of individuals registered (n)") +
     theme_light()+
     theme( # remove the vertical grid lines
            panel.grid.major.x = element_blank() ,
            panel.grid.minor.x = element_blank() ,
     )
 rm(insect)
+rm(loc_insect)
 ```
 
 
@@ -197,6 +228,11 @@ seeds <- monthly_species_count %>%
   select_type_location(type="Seed & Fruit Eaters", region1="both") %>% 
   replace_species_by_other(threshold = thresh,column_name = "monthly_max")
 
+loc_seeds <- monthly_species_count_location %>% 
+    select_type_location(type="Seed & Fruit Eaters", region1="both") %>% 
+    group_by(location1,month) %>% 
+    summarise(max_count = sum(monthly_max))
+
 ggplot() + 
   # --- NCOS count by species ---
     geom_bar(data = seeds,
@@ -204,15 +240,20 @@ ggplot() +
              stat="identity", 
              aes(fill=species,x=month, y=monthly_max,))+
         scale_fill_manual(values = c(  "#D16103","#4E84C4","#C3D7A4", "#C4961A", "azure3"))+
+    # ---- count by site ---
+    geom_point(data = loc_seeds,
+              aes(col=location1, x=month, y=max_count))+
+    scale_colour_grey(start=0.1, end=0.4)+
   # --- themes ---
     labs(title="Seed & Fruit Eaters at OMGC and South Parcel (08/2011-09/2013)",
-         y = "maximum of individuals registered (n)") +
+         y = "maximum number of individuals registered (n)") +
     theme_light()+
     theme( # remove the vertical grid lines
            panel.grid.major.x = element_blank() ,
            panel.grid.minor.x = element_blank() ,
     )
 rm(seeds)
+rm(loc_seeds)
 ```
 
 ```{r}
@@ -223,6 +264,10 @@ omnis <- monthly_species_count %>%
   select_type_location(type="Omnivores", region1="both") %>% 
   replace_species_by_other(threshold = thresh,column_name = "monthly_max")
 
+loc_omnis <- monthly_species_count_location %>% 
+    select_type_location(type="Omnivores", region1="both") %>% 
+    group_by(location1,month) %>% 
+    summarise(max_count = sum(monthly_max))
 
 ggplot() + 
   # --- NCOS count by species ---
@@ -231,15 +276,20 @@ ggplot() +
              stat="identity", 
              aes(fill=species, y=monthly_max, x=month))+
         scale_fill_manual(values = c("#4E84C4", "chartreuse4", "#C4961A", "#D16103","darkorchid","azure3"))+
+    # ---- count by site ---
+    geom_point(data = loc_omnis,
+              aes(col=location1, x=month, y=max_count))+
+    scale_colour_grey(start=0.1, end=0.4)+
   # --- themes ---
     labs(title="Omnivores at OMGC and South Parcel (08/2011-09/2013)",
-         y = "maximum of individuals registered (n)") +
+         y = "maximum number of individuals registered (n)") +
     theme_light()+
     theme( # remove the vertical grid lines
            panel.grid.major.x = element_blank() ,
            panel.grid.minor.x = element_blank() ,
     )
 rm(omnis)
+rm(loc_omnis)
 ```
 
 
@@ -251,6 +301,10 @@ wfl <- monthly_species_count %>%
   select_type_location(type="Waterfowl & Friends", region1="both") %>% 
   replace_species_by_other(threshold = thresh,column_name = "monthly_max")
 
+loc_wfl <- monthly_species_count_location %>% 
+    select_type_location(type="Waterfowl & Friends", region1="both") %>% 
+    group_by(location1,month) %>% 
+    summarise(max_count = sum(monthly_max))
 
 ggplot() + 
   # --- NCOS count by species ---
@@ -259,9 +313,13 @@ ggplot() +
              stat="identity", 
              aes(fill=species, y=monthly_max, x=month))+
     scale_fill_manual(values = c("#4E84C4", "#C4961A", "#D16103","azure3"))+
+    # ---- count by site ---
+    geom_point(data = loc_wfl,
+              aes(col=location1, x=month, y=max_count))+
+    scale_colour_grey(start=0.1, end=0.4)+
   # --- themes ---
     labs(title="Waterfowl & Friends at OMGC and South Parcel (08/2011-09/2013)",
-         y = "number of individuals registered (n)") +
+         y = "maximum number of individuals registered (n)") +
     theme_light()+
     theme( # remove the vertical grid lines
            panel.grid.major.x = element_blank() ,
