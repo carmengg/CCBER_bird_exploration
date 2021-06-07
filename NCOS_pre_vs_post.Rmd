@@ -4,8 +4,8 @@ author: "Carmen Galaz-García"
 date: "6/6/2021"
 output: 
   html_document:
-    #toc: true  # make a table of contents
-    #toc_float: true  # table of contents as sidebar
+    toc: true  # make a table of contents
+    toc_float: true  # table of contents as sidebar
     #number_sections: true  
     code_folding: hide  # makes hide/show for code---
 
@@ -22,7 +22,8 @@ library(tsibble)
 
 # About the data
 The pre-restoration data corresponds to CCBER surveys taking place in the South Parcel and Ocean Meadows Golf Course from July 2011 to August 2013.
-The post-restoration data corresponds to CCBER surveys taking place at North Campus Open Space from July 2011 to August 2013.
+The post-restoration data corresponds to CCBER surveys taking place at North Campus Open Space from September 2017 to August 2019.
+
 ## Data Selection
 
 ```{r}
@@ -165,7 +166,9 @@ type_graph <- function(dataf, gen_type){
     filter(general_type == gen_type) %>% 
     select(date, count, general_type) %>% 
     count(date, general_type, 
-        wt=count) 
+        wt=count) %>% 
+    as_tsibble(key = general_type, index=date)
+
   
   plot <- ggplot(data= type_count, aes(x=date, y=n)) +
     geom_line()+
