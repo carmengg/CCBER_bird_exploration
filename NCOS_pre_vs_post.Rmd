@@ -22,19 +22,6 @@ library(tsibble)
 
 
 ```{r}
-# ---- RAW SURVEYS DATA ----
-
-# --- pre-restoration data
-pre_survey_data <- read.csv(here('CCBER_data_and_script_files','survey_data.csv')) %>%
-  clean_names() %>% 
-  mutate
-
-
-
-```
-
-
-```{r}
 # ----- Bird common names from bbl_codes ----
 
 bbl_codes <- read_csv(here("BBL_codes.csv")) %>% 
@@ -47,7 +34,14 @@ bird_types <- read_csv(here("bird_types.csv")) %>%
 
 
 ```{r}
-# ---- DATA SELECTION ----
+# ---- PRE-RESTORATION DATA SELECTION ----
+
+# --- raw pre-restoration data
+raw_pre_surveys <- read.csv(here('CCBER_data_and_script_files','survey_data.csv')) %>%
+  clean_names() %>% 
+  mutate
+
+# ------------------------------
 # selecting all CCBER observations for 
 #     Ocean Meadows Golf Course AND South Parcel
 # all CCBER observations have 
@@ -56,15 +50,20 @@ bird_types <- read_csv(here("bird_types.csv")) %>%
 #    num_locations = 1 
 #    location2, location3, location 4 = NA
 
-ccber_surveys <- pre_survey_data %>% 
+pre_ccber_surveys <- raw_pre_surveys %>% 
   filter(source1 == "CCBER") %>% 
+  mutate(date = mdy(date)) %>% 
   select(date,
          location1, 
          total_count,
          bbl_code) %>% 
   filter(location1 %in% c("OMG","SP")) %>%
   left_join(y=bbl_codes,by="bbl_code") %>%    # --- add common names
-  left_join(y=bird_types, by = c("common_name" = "species"))
+  left_join(y=bird_types, by = c("common_name" = "species")) %>%  # --- add general_type
+  select(date, total_count, common_name, general_type) %>% 
+  rename(count = total_count) %>% 
+  relocate(common_name, .after = date)
+  
 
 rm(bbl_codes)
 rm(bird_types)
@@ -77,4 +76,29 @@ rm(bird_types)
 # no_type <- ccber_surveys %>% 
 #   filter(is.na(general_type))
 
+```
+
+
+```{r}
+# ---- POST-RESTORATION DATA SELECTION ----
+
+# --- raw post-restoration data
+raw_post_surveys <- read.csv(here('data','COPR_NCOS_Bird_Survey_Data_Aug2017_Aug2019.csv')) %>% 
+  clean_names()
+
+# ------------------------------
+# selecting all CCBER bird surveys for NCOS from 2016 onward
+post_ccber_surveys <- raw_post_surveys %>% 
+  # --- date formatting and selection ---
+  mutate(observation_date = lubridate::mdy(observation_date)) %>%
+  filter( 2016 <= year(observation_date),
+          location == "NCOS") %>% 
+  # --- column simplification ---
+  select(observation_date, 
+         species,
+         general_type,
+         count) %>% 
+  rename(date = observation_date,
+         common_name = species) %>% 
+  relocate(count, .after=common_name)
 ```
